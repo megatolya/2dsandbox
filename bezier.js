@@ -134,5 +134,7 @@ const tInput = document.querySelector('.input-t');
 let outline = outlineInput.value;
 let t = tInput.value;
 
+draw(t, outline);
+
 outlineInput.addEventListener('input', redraw);
 tInput.addEventListener('input', redraw);
