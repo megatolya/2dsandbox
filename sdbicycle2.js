@@ -2,8 +2,25 @@ const canvas = document.getElementsByTagName('canvas')[0];
 const ctx = canvas.getContext('2d');
 
 
-const targetX = 700;
-const targetY = 500;
+let targetX = 0;
+let targetY = 0;
+let targetI = -1;
+const targets = [
+    {x: 250, y: 80},
+    {x: 380, y: 150},
+    {x: 530, y: 350},
+];
+
+function setNextTarget() {
+    targetI++;
+    if (targetI === targets.length) targetI = 0;
+    targets.forEach(target => target.active = false);
+    targets[targetI].active = true;
+    targetX = targets[targetI].x;
+    targetY = targets[targetI].y;
+}
+
+setNextTarget();
 
 const bicycleLength = 120;
 
@@ -27,7 +44,10 @@ function drawTrajectory({x, y, theta, delta}) {
 }
 
 function drawTarget() {
-    ctx.fillRect(targetX - 5, targetY - 5, 10, 10);
+    targets.forEach(({x, y, active}) => {
+        ctx.fillStyle = active ? 'black' : 'grey';
+        ctx.fillRect(x - 5, y - 5, 10, 10);
+    });
 }
 
 function drawBicycle({x, y, delta, theta, velocity, color}) {
@@ -89,45 +109,6 @@ const colors = [
     'red', 'green', 'blue', 'grey', 'pink'
 ]
 
-const blueVariant = {
-    acceleration: 30.5,
-    color: "blue",
-    delta: 0,
-    rotationSpeed: 0.12,
-    theta: 0,
-    velocity: 0,
-    x: 50,
-    y: 50,
-};
-
-const createAnimation = ({
-    acceleration,
-    color,
-    delta,
-    rotationSpeed,
-    theta,
-    velocity,
-    x,
-    y,
-}) => {
-    let prevTime = Date.now();
-
-    return () => {
-        let timePassed = Date.now() -  prevTime;
-        prevTime = Date.now();
-
-        x += velocity * Math.cos(theta);
-        y += velocity * Math.sin(theta);
-        delta += timePassed * rotationSpeed/ 150;
-        velocity += timePassed * acceleration / 1300;
-        theta += (velocity * Math.tan(delta)) / bicycleLength;
-
-        drawBicycle({x, y, delta, theta, velocity, color:'purple'});
-    };
-};
-
-const nextFrame = createAnimation(blueVariant);
-
 let x = 50;
 let y = 50;
 
@@ -144,19 +125,25 @@ const getFnFromPoints = ([x1, y1], [x2, y2]) => {
     return x => m * (x - x1) + y1;
 };
 
-function getIsPointsToTarget({x, y, delta, theta}) {
-    const b = Math.sin(theta) * bicycleLength;
-    const a = b / Math.tan(theta);
+function getPointsDistance([x1, y1], [x2, y2]) {
+    return Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2));
+}
 
+function getFnsAngle(fn1, fn2) {
+    const x1 = 0;
+    const x2 = 1;
+    const [a1x, a1y, a2x, a2y] = [x1, fn1(x1), x2, fn1(x2)];
+    const [b1x, b1y, b2x, b2y] = [x1, fn2(x1), x2, fn2(x2)];
+    const dAx = a2x - a1x;
+    const dAy = a2y - a1y;
+    const dBx = b2x - b1x;
+    const dBy = b2y - b1y;
+    const angle = Math.atan2(dAx * dBy - dAy * dBx, dAx * dBx + dAy * dBy);
+    var degree_angle = angle * (180 / Math.PI);
+    return angle;
+}
 
-    const x1 = x + a;
-    const y1 = y + b;
-
-    const c2 = 100;
-    const a2 = c2 * Math.cos(delta + theta);
-    const b2 = c2 * Math.sin(delta + theta);
-
-
+function drawDebugLines({x, y, a, b, a2, b2, headPointerFn}) {
     ctx.beginPath();
     ctx.moveTo(x, y);
     ctx.strokeStyle = 'red';
@@ -173,38 +160,62 @@ function getIsPointsToTarget({x, y, delta, theta}) {
     ctx.lineTo(x + a, y + b);
     ctx.stroke();
 
-    const fn2 = getFnFromPoints([x + a, y + b], [x + a + a2, y + b + b2]);
-
     ctx.beginPath();
     ctx.strokeStyle = 'purple';
     ctx.moveTo(x + a, y + b);
-    ctx.lineTo(targetX, fn2(targetX));
+    ctx.lineTo(targetX, headPointerFn(targetX));
     ctx.stroke();
-    return Math.abs(fn2(targetX) - targetY) < 5;
 
+    ctx.beginPath();
+    ctx.strokeStyle = 'yellow';
+    ctx.moveTo(x + a, y + b);
+    ctx.lineTo(targetX, targetY);
+    ctx.stroke();
 
 }
 
-function draw(ms) {
-    // ms  = ms*1000000;
+function calcPositionToTarget({x, y, delta, theta}) {
+    const b = Math.sin(theta) * bicycleLength;
+    const a = theta === 0 ? 0 : b / Math.tan(theta);
+    const x1 = x + a;
+    const y1 = y + b;
+    const c2 = 100;
+    const a2 = c2 * Math.cos(delta + theta);
+    const b2 = c2 * Math.sin(delta + theta);
+
+    const headPointerFn = getFnFromPoints([x + a, y + b], [x + a + a2, y + b + b2]);
+    const bodyToTargetFn = getFnFromPoints([x + a, y + b], [targetX, targetY]);
+
+    const angleToTarget = getFnsAngle(headPointerFn, bodyToTargetFn);
+    const distanceToTarget = getPointsDistance([x + a, y + b], [targetX, targetY]);
+
+
+    drawDebugLines({x, y, a, b, a2, b2, headPointerFn});
+    return {angleToTarget, distanceToTarget};
+}
+
+function drawVariants(ms) {
+    // ms  = ms*10;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const waypoints = [];
 
-    const isPointsToTarget = getIsPointsToTarget({x, y, delta, theta});
+    const {angleToTarget, distanceToTarget} = calcPositionToTarget({x, y, delta, theta});
+    if (distanceToTarget < 2) {
+        setNextTarget();
+    }
 
 
-    let rotationSpeed = 0.00028; // degrees per pixel
+
+    let rotationSpeed = 0.00058; // degrees per pixel
     let acceleration = 0.0005; // pixel per pixel
 
     velocity += acceleration * ms;
     x += velocity * Math.cos(theta);
     y += velocity * Math.sin(theta);
-    if (isPointsToTarget) {
-        console.log('-');
-        delta -= rotationSpeed * 1 *  ms;
-    } else {
-        console.log('+');
-        delta += rotationSpeed * ms;
+    if (angleToTarget > 0) {
+        delta += Math.min(rotationSpeed * 1 *  ms, angleToTarget);
+    } else if (angleToTarget < 0) {
+        delta -= Math.max(rotationSpeed * ms, angleToTarget);
     }
 
     delta = Math.min(delta, deltaMax);
@@ -219,6 +230,6 @@ let prevTime = Date.now();
 function update() {
     const passed = Date.now() - prevTime;
     prevTime = Date.now();
-    draw(passed);
+    drawVariants(passed);
     requestAnimationFrame(update);
 }
