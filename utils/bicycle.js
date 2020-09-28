@@ -1,15 +1,22 @@
 const rotationSpeed = 0.00110; // degree per ms
 const acceleration = 0.0009; // pixel per ms
+const brakeSpeed = 0.0039;
 const deltaMax = 0.755; // 41 degree
-const maxVelocity = 2;
+const maxVelocity = 3;
 const bicycleLength = 100;
+const bodyHitboxLength = bicycleLength + 60;
+const headHitboxLength = 150;
 const bicycleWidth = 10;
 
 const wheelLength = 50;
 const wheelWidth = 19;
 
+const bicycles = [];
+
 class Bicycle {
     constructor({x, y, delta, theta, waypoints, color, ctx}) {
+        bicycles.push(this);
+
         this.x = x;
         this.y = y;
         this.delta = delta;
@@ -27,16 +34,23 @@ class Bicycle {
         ms = ms * 2;
 
         let {x, y, velocity, delta, theta} = this;
-        let {angleToTarget, distanceToTarget} = this.calcPositionToTarget2();
+        let {angleToTarget, distanceToTarget} = this.calcPositionToTarget();
 
         if (distanceToTarget < 2) {
             this.setNextTarget();
-            this.draw();
+            this.update(ms);
             return;
         }
 
-        velocity += acceleration * ms;
-        velocity = Math.min(velocity, maxVelocity);
+        const collides = this.isCollides();
+
+        if (collides) {
+            velocity -= brakeSpeed * ms;
+            velocity = Math.max(velocity, 0);
+        } else {
+            velocity += acceleration * ms;
+            velocity = Math.min(velocity, maxVelocity);
+        }
 
         x += velocity * Math.cos(theta);
         y += velocity * Math.sin(theta);
@@ -71,6 +85,22 @@ class Bicycle {
             const value = obj[key];
             this.text(10, 30 * (i + 1), `${key}: ${value}`);
         });
+    }
+
+    isCollides() {
+        const enemies = this.enemies;
+        const {body, head} = this.hitbox;
+        let collides = false;
+        enemies.forEach(enemy => {
+            const {body: ebody, head: ehead} = enemy.hitbox;
+
+            const smthCollides = isLinesCollides(head, ebody);
+
+            if (smthCollides) {
+                collides = true;
+            }
+        });
+        return collides;
     }
 
     draw() {
@@ -158,6 +188,7 @@ class Bicycle {
 
     drawBicycle() {
         const {x, y, delta, theta, velocity, color} = this;
+        const {body: bodyHitbox, head: headHitbox} = this.hitbox;
         const ctx = this.commonCtx;
 
         ctx.save();
@@ -179,6 +210,7 @@ class Bicycle {
         ctx.stroke();
 
         ctx.restore();
+        // line(...headHitbox, '#eee');
     }
 
     drawWaypoints() {
@@ -227,7 +259,7 @@ class Bicycle {
         const a = theta === 0 ? 0 : b / Math.tan(theta);
         const x1 = x + a;
         const y1 = y + b;
-        const c2 = 100;
+        const c2 = 50;
         const a2 = c2 * Math.cos(delta + theta);
         const b2 = c2 * Math.sin(delta + theta);
 
@@ -272,8 +304,7 @@ class Bicycle {
         };
     }
 
-
-    calcPositionToTarget2() {
+    calcPositionToTarget() {
         const [targetX, targetY] = this.target;
         const {x, y, theta, delta} = this;
         const {
@@ -312,33 +343,27 @@ class Bicycle {
         return angle;
     }
 
-    calcPositionToTarget() {
+    get hitbox() {
         const [targetX, targetY] = this.target;
-        const {x, y} = this;
-        const {
-            cx, cy,
-            a, b,
-            a2, b2, c2,
-            bodyFn,
-            headPointerFn, xAxisFn, headToTargetFn,
-            bodyAngleToTarget,
-            rotateByBodyCenter,
-            rtx, rty,
-            rx2, ry2
-        } = this.calc();
+        const {x, y, delta, theta} = this;
+        const {a, b} = this.calc();
+        const y1 = Math.sin(theta) * bodyHitboxLength;
+        const x1 = theta === 0 ? 0 : y1 / Math.tan(theta);
+        const a2 = headHitboxLength * Math.cos(delta + theta);
+        const b2 = headHitboxLength * Math.sin(delta + theta);
+        return {
+            body: [[x, y], [x + x1, y + y1]],
+            head: [[x + a, y + b], [x + a + a2, y + b + b2]]
+        };
+    }
 
-        let angleToTarget = getFnsAngle(headPointerFn, headToTargetFn, false);
-
-        if (rtx < rx2 && rty > ry2) {
-            angleToTarget = deltaMax;
-        }
-
-        if (rtx < rx2 && rty < ry2) {
-            // console.log('OH NO LOL');
-            angleToTarget = -deltaMax;
-        }
-
-        const distanceToTarget = getPointsDistance([x + a, y + b], [targetX, targetY]);
-        return {angleToTarget, distanceToTarget};
+    get enemies() {
+        return bicycles.filter(b => b !== this);
     }
 }
+
+Bicycle.update = passed => {
+    bicycles.forEach(bicycle => {
+        bicycle.update(passed);
+    });
+};

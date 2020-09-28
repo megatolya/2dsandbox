@@ -27,22 +27,32 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const bicycle2 = new Bicycle({
-        x: 150,
-        y: 150,
+        x: 50,
+        y: 650,
         delta: 0,
         theta: 0,
-        waypoints: [[300, 100], [750, 500]],
+        waypoints: [[300, 100], [500, 300], [750, 500]],
         color: 'blue',
         ctx
     });
 
     const bicycle3 = new Bicycle({
-        x: 600,
-        y: 150,
+        x: 800,
+        y: 550,
         delta: 0,
         theta: Math.PI,
-        waypoints: [[200, 100], [750, 500], [750, 100]],
+        waypoints: [[200, 100], [750, 500], [750, 100], [10, 550]],
         color: 'green',
+        ctx
+    });
+
+    const bicycle4 = new Bicycle({
+        x: 200,
+        y: 150,
+        delta: 0,
+        theta: 0,
+        waypoints: [[100, 100]],
+        color: 'purple',
         ctx
     });
 
@@ -58,9 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const passed = Date.now() - prevTime;
         prevTime = Date.now();
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        bicycle1.update(passed);
-        bicycle2.update(passed);
-        bicycle3.update(passed);
+        Bicycle.update(passed);
         requestAnimationFrame(update);
     }
 

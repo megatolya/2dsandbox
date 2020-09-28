@@ -37,6 +37,12 @@ function getTurnAngle(p1, p2, p3) {
     return res;
 }
 
+function isLinesCollides(line1, line2) {
+    const [l1, l2] = line1;
+    const [l3, l4] = line2;
+    return isLinesIntersects(...l1, ...l2, ...l3, ...l4);
+}
+
 
 function isLinesIntersects(a,b,c,d,p,q,r,s) {
   var det, gamma, lambda;
