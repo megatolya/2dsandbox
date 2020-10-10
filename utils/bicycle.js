@@ -13,8 +13,9 @@ const wheelWidth = 19;
 
 const bicycles = [];
 
-class Bicycle {
+class Bicycle extends EventTarget {
     constructor({x, y, delta, theta, waypoints, color, ctx}) {
+        super();
         bicycles.push(this);
 
         this.x = x;
@@ -31,6 +32,8 @@ class Bicycle {
     }
 
     update(ms) {
+        if (this.disappeared) return;
+
         ms = ms * 2;
 
         let {x, y, velocity, delta, theta} = this;
@@ -177,7 +180,6 @@ class Bicycle {
         ], [
             rtx2, rty2
         ]);
-        // console.log(distanceToTarget, distanceToTarget2);
         // drawDebugLines({
             // x, y, a, b, a2, b2, headPointerFn,
             // rx1, ry1, rx2, ry2,
@@ -232,7 +234,29 @@ class Bicycle {
         this.targetI++;
         const waypoints = this.waypoints;
 
-        if (this.targetI === waypoints.length) this.targetI = 0;
+        if (this.targetI === waypoints.length) {
+            this.disappear();
+            return;
+        }
+
+        this.emit('targetchange', this.waypoints[this.targetI]);
+    }
+
+    on(eventName, fn) {
+        this.addEventListener(eventName, fn);
+    }
+
+    emit(eventName, data) {
+        const event = new Event(eventName);
+        event.data = data;
+        this.dispatchEvent(event);
+    }
+
+    disappear() {
+        this.disappeared = true;
+        bicycles.splice(bicycles.indexOf(this), 1);
+        Bicycle.update(0);
+        this.ctx.canvas.remove();
     }
 
     line(...args) {
