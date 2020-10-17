@@ -95,7 +95,8 @@ function crect(ctx, x, y, width, height, color = 'gray') {
 }
 
 function ctext(ctx, x, y, text) {
-     // ctx.font = "48px serif";
+    // ctx.font = "48px serif";
+    ctx.fillStyle = 'red';
     ctx.fillText(text, x, y);
 }
 
